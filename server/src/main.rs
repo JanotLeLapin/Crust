@@ -9,7 +9,7 @@ use std::thread;
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
 
-    let mut buffer: [u8; 255];
+    let mut buffer: [u8; 1024];
     for socket in listener.incoming() {
         let mut socket = socket.unwrap();
 
@@ -22,10 +22,10 @@ fn main() {
         });
 
         loop {
-            buffer = [0; 255];
+            buffer = [0; 1024];
             match socket.read(&mut buffer).unwrap() {
                 0 => break,
-                _ => handler::handle(socket_tx.clone(), buffer.to_vec()),
+                len => handler::handle(socket_tx.clone(), buffer[0..len].to_vec()),
             };
         };
     }

@@ -17,27 +17,35 @@ defmodule Proxy.Client do
 
   @impl true
   def init(socket) do
-    {:ok, socket}
+    {:ok, %{
+      "socket" => socket,
+      # Connection state
+      # 0 = handshaking
+      # 1 = status
+      # 2 = login
+      # 3 = play
+      "state" => 0,
+    }}
   end
 
   @impl true
-  def handle_cast({:message, message}, socket) do
+  def handle_cast({:message, message, new_state}, state) do
     # Received message from server process, forward it to Minecraft client
-    socket |> :gen_tcp.send(message)
-    {:noreply, socket}
+    state["socket"] |> :gen_tcp.send(message)
+    {:noreply, new_state |> Map.put("socket", state["socket"])}
   end
 
   @impl true
-  def handle_info({:tcp, _, message}, socket) do
+  def handle_info({:tcp, _, message}, state) do
     # Received message from Minecraft client, forward it to server process
-    Proxy.Connection.send(self(), message)
-    socket |> :inet.setopts(active: :once)
-    {:noreply, socket}
+    Proxy.Connection.send(self(), state, message)
+    state["socket"] |> :inet.setopts(active: :once)
+    {:noreply, state}
   end
 
   @impl true
-  def handle_info({:tcp_closed, _}, socket) do
-    {:noreply, socket}
+  def handle_info({:tcp_closed, _}, state) do
+    {:noreply, state}
   end
 end
 

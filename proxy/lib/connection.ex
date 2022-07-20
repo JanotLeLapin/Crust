@@ -5,8 +5,8 @@ defmodule Proxy.Connection do
     GenServer.start_link(__MODULE__, options, name: __MODULE__)
   end
 
-  def send(pid, packet) do
-    GenServer.cast(__MODULE__, {:send, pid, packet})
+  def send(pid, state, packet) do
+    GenServer.cast(__MODULE__, {:send, pid, state, packet})
   end
 
   @impl true
@@ -16,32 +16,32 @@ defmodule Proxy.Connection do
   end
 
   @impl true
-  def handle_cast({:send, pid, packet}, socket) do
+  def handle_cast({:send, pid, state, packet}, socket) do
     # Received message from some client process, forward it to the server with pid
-    message = [encode_pid(pid)] ++ packet
+    message = JSON.encode!(%{
+      pid: encode_pid(pid),
+      state: state |> Map.delete(:socket),
+      data: packet,
+    })
     socket |> :gen_tcp.send(message)
     {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:tcp, _, data}, socket) do
+  def handle_info({:tcp, _, packet}, socket) do
     # Received message from server, forward it to the requested process
-    {pid, len} = decode_pid(data)
-    pid |> GenServer.cast({:message, data |> Enum.drop(len)})
-
+    message = JSON.decode!(packet)
+    message["pid"] |> decode_pid() |> GenServer.cast({:message, message["data"], message["state"]})
     socket |> :inet.setopts(active: :once)
     {:noreply, socket}
   end
 
   defp encode_pid(pid) do
-    list = "#{inspect(pid)}" |> String.slice(5, 100) |> String.trim(">") |> :binary.bin_to_list()
-    [length(list)] ++ list
+    "#{inspect(pid)}" |> String.slice(5, 100) |> String.trim(">")
   end
 
-  defp decode_pid(data) do
-    len = data |> Enum.at(0)
-    pid = data |> Enum.slice(1, len)
-    {IEx.Helpers.pid("#{pid}"), len + 1}
+  defp decode_pid(pid) do
+    IEx.Helpers.pid("#{pid}")
   end
 end
 

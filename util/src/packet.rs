@@ -1,6 +1,17 @@
+use serde::{Serialize,Deserialize};
+use serde_json::{Value,json};
+
+#[derive(Serialize,Deserialize)]
+pub struct Packet {
+    pub pid: String,
+    pub state: Value,
+    pub data: Vec<u8>,
+}
+
 pub struct PacketBuilder {
     packet_id: i32,
     process_id: String,
+    state: Value,
     data: Vec<u8>,
 }
 
@@ -18,17 +29,12 @@ fn to_varint(value: i32) -> Vec<u8> {
     }
 }
 
-fn to_string(value: String) -> Vec<u8> {
-    let mut size = to_varint(value.len() as i32);
-    size.append(&mut value.as_bytes().to_vec());
-    size
-}
-
 impl PacketBuilder {
-    pub fn new(packet_id: i32, process_id: String) -> Self {
+    pub fn new(packet_id: i32, process_id: String, state: Value) -> Self {
         PacketBuilder {
             packet_id,
             process_id,
+            state,
             data: Vec::new(),
         }
     }
@@ -39,19 +45,26 @@ impl PacketBuilder {
     }
 
     pub fn write_string(mut self, value: String) -> Self {
-        self.data.append(&mut to_string(value));
+        let mut size = to_varint(value.len() as i32);
+        self.data.append(&mut size);
+        self.data.append(&mut value.as_bytes().to_vec());
         self
     }
 
     pub fn finish(mut self) -> Vec<u8> {
         let mut packet_id = to_varint(self.packet_id);
         let mut length = to_varint((packet_id.len() + self.data.len()) as i32);
-        let mut data = to_string(self.process_id);
+        let mut data = vec![];
 
         data.append(&mut length);
         data.append(&mut packet_id);
         data.append(&mut self.data);
-        data
+
+        json!(Packet {
+            pid: self.process_id,
+            state: self.state,
+            data,
+        }).to_string().into_bytes()
     }
 }
 
