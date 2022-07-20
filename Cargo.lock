@@ -3,6 +3,13 @@
 version = 3
 
 [[package]]
+name = "crust-common"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "crust-util"
 version = "0.1.0"
 
@@ -39,6 +46,7 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "crust-common",
  "crust-util",
  "serde_json",
 ]

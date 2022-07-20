@@ -1,6 +1,7 @@
 use std::io::prelude::*;
 
 use serde_json::json;
+use common::chat::ChatBuilder;
 use util::packet::*;
 
 pub fn handle(socket: &mut std::net::TcpStream, buffer: Vec<u8>) {
@@ -12,26 +13,31 @@ pub fn handle(socket: &mut std::net::TcpStream, buffer: Vec<u8>) {
 
     match packet_id {
         0x00 => {
-            println!("{}", offset);
             let (protocol_version, offset) = read_varint(&buffer, offset).unwrap();
             let (_, offset) = read_string(&buffer, offset).unwrap();
             let next_state = buffer[offset + 2];
 
             match next_state {
                 1 => {
+                    let description = ChatBuilder::new("Welcome to Crust")
+                        .color(String::from("gold"))
+                        .bold()
+                        .italic()
+                        .finish();
+
+                    let version = util::version::from_protocol(protocol_version as u16);
+
                     let motd = json!({
                         "version": {
-                            "name": "1.8.8",
-                            "protocol": protocol_version,
+                            "name": "1.8-1.19",
+                            "protocol": if let None = version { 0 } else { protocol_version },
                         },
                         "players": {
                             "max": 100,
                             "online": 0,
                             "sample": [],
                         },
-                        "description": {
-                            "text": "Welcome to Crust",
-                        },
+                        "description": description,
                     });
 
                     let packet = PacketBuilder::new(0x00, process_id)
