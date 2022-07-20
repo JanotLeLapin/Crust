@@ -1,10 +1,8 @@
-use std::io::prelude::*;
-
 use serde_json::json;
 use common::chat::ChatBuilder;
 use util::packet::*;
 
-pub fn handle(socket: &mut std::net::TcpStream, buffer: Vec<u8>) {
+pub fn handle(socket: std::sync::mpsc::Sender<Vec<u8>>, buffer: Vec<u8>) {
     let (process_id, offset) = read_string(&buffer, 0).unwrap();
     let (_, offset) = read_varint(&buffer, offset).unwrap();
     let (packet_id, offset) = read_varint(&buffer, offset).unwrap();
@@ -44,15 +42,13 @@ pub fn handle(socket: &mut std::net::TcpStream, buffer: Vec<u8>) {
                         .write_string(motd.to_string())
                         .finish();
 
-                    socket.write(&packet.as_slice()).unwrap();
-                    socket.flush().unwrap();
+                    socket.send(packet).unwrap();
                 }
                 _ => {}
             }
         }
         0x01 => {
-            socket.write(&buffer.as_slice()).unwrap();
-            socket.flush().unwrap();
+            socket.send(buffer).unwrap();
         }
         id => println!("Unhandled packet ID: {}", id)
     }
