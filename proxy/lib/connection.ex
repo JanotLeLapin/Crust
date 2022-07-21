@@ -20,7 +20,7 @@ defmodule Proxy.Connection do
     # Received message from some client process, forward it to the server with pid
     message = JSON.encode!(%{
       pid: encode_pid(pid),
-      state: state |> Map.delete(:socket),
+      state: state |> Map.delete("socket"),
       data: packet,
     })
     socket |> :gen_tcp.send(message)
@@ -31,7 +31,13 @@ defmodule Proxy.Connection do
   def handle_info({:tcp, _, packet}, socket) do
     # Received message from server, forward it to the requested process
     message = JSON.decode!(packet)
-    message["pid"] |> decode_pid() |> GenServer.cast({:message, message["data"], message["state"]})
+    pid = message["pid"] |> decode_pid()
+    if message |> Map.has_key?("data") do
+      pid |> GenServer.cast({:message, message["data"]})
+    end
+    if message |> Map.has_key?("state") do
+      pid |> GenServer.cast({:state, message["state"]})
+    end
     socket |> :inet.setopts(active: :once)
     {:noreply, socket}
   end

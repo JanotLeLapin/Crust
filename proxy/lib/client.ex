@@ -29,16 +29,53 @@ defmodule Proxy.Client do
   end
 
   @impl true
-  def handle_cast({:message, message, new_state}, state) do
-    # Received message from server process, forward it to Minecraft client
-    state["socket"] |> :gen_tcp.send(message)
+  def handle_cast({:state, new_state}, state) do
+    # Received state change from server process, update state
     {:noreply, new_state |> Map.put("socket", state["socket"])}
   end
 
   @impl true
+  def handle_cast({:message, message}, state) do
+    # Received message from server process, forward it to Minecraft client
+    state["socket"] |> :gen_tcp.send(message)
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info({:tcp, _, message}, state) do
-    # Received message from Minecraft client, forward it to server process
-    Proxy.Connection.send(self(), state, message)
+    # Received message from Minecraft client
+
+    IO.inspect(message)
+
+    state = case state["state"] do
+      0 ->
+        # Decode handshake packet directly from proxy
+        # otherwise following packet (status request or login start)
+        # will be sent with outdated state
+
+        {packet_size, packet_size_length} = message |> Proxy.Util.read_varint(0)
+        # Assume packet id is 0x00
+        {_, offset} = message |> Proxy.Util.read_varint(packet_size_length)
+        {protocol, offset} = message |> Proxy.Util.read_varint(offset)
+        {address_size, offset} = message |> Proxy.Util.read_varint(offset)
+        # Skip server address (string) and port number (short) and we get the next state
+        next_state = message |> Enum.at(offset + address_size + 2)
+
+        new_state = state |> Map.put("protocol", protocol) |> Map.put("state", next_state)
+
+        # The following packet is sent right after the handshake packet, so the two
+        # may be merged together.
+        size = packet_size + packet_size_length
+        if length(message) > size do
+          Proxy.Connection.send(self(), new_state, message |> Enum.drop(size))
+        end
+
+        new_state
+      _ ->
+        Proxy.Connection.send(self(), state, message)
+        state
+    end
+
     state["socket"] |> :inet.setopts(active: :once)
     {:noreply, state}
   end

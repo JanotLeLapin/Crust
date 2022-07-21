@@ -11,7 +11,7 @@ pub struct Packet {
 pub struct PacketBuilder {
     packet_id: i32,
     process_id: String,
-    state: Value,
+    state: Option<Value>,
     data: Vec<u8>,
 }
 
@@ -30,13 +30,18 @@ fn to_varint(value: i32) -> Vec<u8> {
 }
 
 impl PacketBuilder {
-    pub fn new(packet_id: i32, process_id: String, state: Value) -> Self {
+    pub fn new(packet_id: i32, process_id: String) -> Self {
         PacketBuilder {
             packet_id,
             process_id,
-            state,
+            state: None,
             data: Vec::new(),
         }
+    }
+
+    pub fn state(mut self, state: Value) -> Self {
+        self.state = Some(state);
+        self
     }
 
     pub fn write_varint(mut self, value: i32) -> Self {
@@ -62,7 +67,7 @@ impl PacketBuilder {
 
         json!(Packet {
             pid: self.process_id,
-            state: self.state,
+            state: self.state.unwrap_or(Value::Null),
             data,
         }).to_string().into_bytes()
     }
