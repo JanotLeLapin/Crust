@@ -45,8 +45,6 @@ defmodule Proxy.Client do
   def handle_info({:tcp, _, message}, state) do
     # Received message from Minecraft client
 
-    IO.inspect(message)
-
     state = case state["state"] do
       0 ->
         # Decode handshake packet directly from proxy

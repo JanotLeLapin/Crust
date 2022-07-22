@@ -56,7 +56,16 @@ impl PacketBuilder {
         self
     }
 
+    pub fn write_sized<T: num::Num + num::ToPrimitive>(mut self, value: T) -> Self {
+        let size = std::mem::size_of_val(&value);
+        for i in 0..size {
+            self.data.push(((value.to_usize().unwrap() >> (size - 1 - i) * 8) & 0xFF) as u8)
+        };
+        self
+    }
+
     pub fn finish(mut self) -> Vec<u8> {
+        // Minecraft packet format, will be interpreted by the client
         let mut packet_id = to_varint(self.packet_id);
         let mut length = to_varint((packet_id.len() + self.data.len()) as i32);
         let mut data = vec![];
@@ -65,11 +74,22 @@ impl PacketBuilder {
         data.append(&mut packet_id);
         data.append(&mut self.data);
 
-        json!(Packet {
+        // Additional metadata, will be interpreted by the proxy
+        let mut wrap = json!(Packet {
             pid: self.process_id,
             state: self.state.unwrap_or(Value::Null),
             data,
-        }).to_string().into_bytes()
+        }).to_string().into_bytes();
+        let mut packet = to_varint(wrap.len() as i32);
+        packet.append(&mut wrap);
+
+        // The final packet should look like:
+        // <packet size>{
+        //   "pid": <proxy process id>,
+        //   "state": <proxy process state>,
+        //   "data": <Minecraft packet>
+        // }
+        packet
     }
 }
 
@@ -105,5 +125,15 @@ pub fn read_string(packet: &Vec<u8>, offset: usize) -> Option<(String, usize)> {
     };
 
     Some((res, offset + size))
+}
+
+pub fn read_sized<T: num::Num + num::FromPrimitive>(packet: &Vec<u8>, offset: usize) -> (T, usize) {
+    let size = std::mem::size_of::<T>();
+    let mut value: u64 = packet[offset] as u64;
+    for i in 1..size {
+        value = value << 8 | packet[offset + i] as u64;
+    };
+
+    (num::FromPrimitive::from_u64(value).unwrap(), size)
 }
 

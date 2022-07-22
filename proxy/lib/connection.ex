@@ -22,22 +22,34 @@ defmodule Proxy.Connection do
       pid: encode_pid(pid),
       state: state |> Map.delete("socket"),
       data: packet,
-    })
-    socket |> :gen_tcp.send(message)
+    }) |> :binary.bin_to_list()
+    socket |> :gen_tcp.send((length(message) |> Proxy.Util.int_to_bytes()) ++ message)
     {:noreply, socket}
+  end
+
+  defp unmerge_packets(packets, result) do
+    case length(packets) do
+      0 -> result
+      _ ->
+        {size, offset} = Proxy.Util.read_varint(packets, 0)
+        unmerge_packets(packets |> Enum.drop(size + offset), result ++ [packets |> Enum.drop(offset) |> Enum.take(size)])
+    end
   end
 
   @impl true
   def handle_info({:tcp, _, packet}, socket) do
     # Received message from server, forward it to the requested process
-    message = JSON.decode!(packet)
-    pid = message["pid"] |> decode_pid()
-    if message |> Map.has_key?("data") do
+    # Packets may be merged when sent at the same time, unmerge before decoding
+    packet |> unmerge_packets([]) |> Enum.map(fn packet ->
+      message = JSON.decode!(packet)
+      pid = message["pid"] |> decode_pid()
       pid |> GenServer.cast({:message, message["data"]})
-    end
-    if message |> Map.has_key?("state") do
-      pid |> GenServer.cast({:state, message["state"]})
-    end
+
+      state = message["state"]
+      if state != nil do
+        pid |> GenServer.cast({:state, message["state"]})
+      end
+    end)
     socket |> :inet.setopts(active: :once)
     {:noreply, socket}
   end

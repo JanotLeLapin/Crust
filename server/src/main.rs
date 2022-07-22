@@ -8,8 +8,6 @@ use std::thread;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-
-    let mut buffer: [u8; 1024];
     for socket in listener.incoming() {
         let mut socket = socket.unwrap();
 
@@ -21,12 +19,25 @@ fn main() {
             thread_socket.flush().unwrap();
         });
 
+        let mut size_buffer = [0; 4];
+        let mut buffer = [0; 1024];
         loop {
-            buffer = [0; 1024];
-            match socket.read(&mut buffer).unwrap() {
-                0 => break,
-                len => handler::handle(socket_tx.clone(), buffer[0..len].to_vec()),
+            // Read packet size (4 bytes)
+            match socket.read_exact(&mut size_buffer) {
+                Ok(_) => {}
+                Err(_) => { break; }
             };
+            let (size, _): (u32, usize) = util::packet::read_sized(&size_buffer.to_vec(), 0);
+
+            // Read packet (size bytes)
+            let mut handle = socket.try_clone().unwrap().take(size as u64);
+            let len = handle.read(&mut buffer).unwrap();
+
+            // Decode packet and handle it
+            let packet = &buffer[0..len];
+            let decoded = serde_json::from_slice(packet).unwrap();
+
+            handler::handle(socket_tx.clone(), decoded);
         };
     }
 }

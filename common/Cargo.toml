@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+util = { path = "../util", package = "crust-util" }
+
 serde_json = "1.0.82"
 

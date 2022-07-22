@@ -7,6 +7,8 @@ edition = "2021"
 util = { path = "../util", package = "crust-util" }
 common = { path = "../common", package = "crust-common" }
 
+uuid = { version = "1.1.2", features = [ "v4" ] }
+
 serde = { version = "1.0.140", features = [ "derive" ] }
 serde_json = "1.0.82"
 
