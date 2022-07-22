@@ -24,6 +24,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "crust-server"
+version = "0.1.0"
+dependencies = [
+ "crust-common",
+ "crust-util",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "crust-util"
 version = "0.1.0"
 dependencies = [
@@ -184,17 +195,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "crust-common",
- "crust-util",
- "serde",
- "serde_json",
- "uuid",
 ]
 
 [[package]]
