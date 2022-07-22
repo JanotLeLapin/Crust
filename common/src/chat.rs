@@ -1,4 +1,25 @@
-use serde_json::{Value,json};
+use serde::Serialize;
+
+fn skip(attr: &bool) -> bool { return !attr; }
+
+#[derive(Serialize,Debug)]
+pub struct Chat {
+    pub text: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub color: String,
+    #[serde(skip_serializing_if = "skip")]
+    pub bold: bool,
+    #[serde(skip_serializing_if = "skip")]
+    pub italic: bool,
+    #[serde(skip_serializing_if = "skip")]
+    pub underlined: bool,
+    #[serde(skip_serializing_if = "skip")]
+    pub strikethrough: bool,
+    #[serde(skip_serializing_if = "skip")]
+    pub obfuscated: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub extra: Vec<Self>,
+}
 
 pub struct ChatBuilder {
     text: String,
@@ -56,31 +77,18 @@ impl ChatBuilder {
         self
     }
 
-    pub fn finish(&self) -> Value {
-        let extra: Vec<Value> = self.extra.iter().map(|ex| ex.finish()).collect();
-        let mut message = json!({
-            "text": self.text,
-            "color": self.color,
-        });
-        let t = Value::Bool(true);
-        if self.is_style(0x01) {
-            message["bold"] = t.clone();
-        }
-        if self.is_style(0x02) {
-            message["italic"] = t.clone();
-        }
-        if self.is_style(0x04) {
-            message["underlined"] = t.clone();
-        }
-        if self.is_style(0x08) {
-            message["strikethrough"] = t.clone();
-        }
-        if self.is_style(0x10) {
-            message["obfuscated"] = t.clone();
-        }
-        if extra.len() > 0 {
-            message["extra"] = t.clone();
-        }
+    pub fn finish(&self) -> Chat {
+        let extra: Vec<Chat> = self.extra.iter().map(|ex| ex.finish()).collect();
+        let message = Chat {
+            text: self.text.clone(),
+            color: self.color.clone(),
+            bold: self.is_style(0x01),
+            italic: self.is_style(0x02),
+            underlined: self.is_style(0x04),
+            strikethrough: self.is_style(0x08),
+            obfuscated: self.is_style(0x10),
+            extra,
+        };
 
         message
     }

@@ -19,6 +19,7 @@ name = "crust-common"
 version = "0.1.0"
 dependencies = [
  "crust-util",
+ "serde",
  "serde_json",
 ]
 
