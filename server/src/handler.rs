@@ -13,10 +13,12 @@ pub fn handle(socket: std::sync::mpsc::Sender<Vec<u8>>, packet: Packet) {
         1 => {
             match packet_id {
                 0 => {
-                    let description = ChatBuilder::new("Welcome to Crust")
-                        .color(String::from("gold"))
-                        .bold()
-                        .italic()
+                    let description = ChatBuilder::new("Welcome to")
+                        .color("yellow")
+                        .space()
+                        .append(
+                            ChatBuilder::new("Crust").color("gold")
+                        )
                         .finish();
 
                     let protocol = state["protocol"].as_u64().unwrap() as u16;
