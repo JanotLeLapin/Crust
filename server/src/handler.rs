@@ -71,6 +71,28 @@ pub fn handle(socket: std::sync::mpsc::Sender<Vec<u8>>, packet: Packet) {
         }
         // Play
         3 => {
+            match packet_id {
+                // Client settings
+                0x15 => {
+                    let (locale, _) = util::packet::read_string(&data, offset).unwrap();
+
+                    // Check client version
+                    if let None = util::version::from_protocol(state["protocol"].as_u64().unwrap() as u16) {
+                        let message = match locale.split("_").collect::<Vec<&str>>()[0] {
+                            "fr" => "Version non supportée.",
+                            _ => "Unsupported version."
+                        };
+
+                        let chat = ChatBuilder::new(message).color("red").finish();
+                        let packet = PacketBuilder::new(0x40, pid)
+                            .write_string(serde_json::to_string(&chat).unwrap())
+                            .finish();
+
+                        socket.send(packet).unwrap();
+                    }
+                }
+                _ => {}
+            }
         }
         state => println!("Unknown state: {}", state)
     }
