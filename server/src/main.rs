@@ -1,5 +1,7 @@
 mod handler;
 
+use common::config::Config;
+
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::sync::mpsc;
@@ -17,6 +19,15 @@ fn main() {
         thread::spawn(move || while let Ok(message) = socket_rx.recv() {
             thread_socket.write(&message.as_slice()).unwrap();
             thread_socket.flush().unwrap();
+        });
+
+        let (config_tx, config_rx): (Sender<Sender<Config>>, Receiver<Sender<Config>>) = mpsc::channel();
+        thread::spawn(move || {
+            let content = std::fs::read_to_string("config.toml").unwrap();
+            let config: Config = toml::from_str(&content).unwrap();
+            while let Ok(resp) = config_rx.recv() {
+                resp.send(config.clone()).unwrap();
+            }
         });
 
         let mut size_buffer = [0; 4];
@@ -37,7 +48,7 @@ fn main() {
             let packet = &buffer[0..len];
             let decoded = serde_json::from_slice(packet).unwrap();
 
-            handler::handle(socket_tx.clone(), decoded);
+            handler::handle(socket_tx.clone(), config_tx.clone(), decoded);
         };
     }
 }

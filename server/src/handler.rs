@@ -1,9 +1,13 @@
 use common::chat::ChatBuilder;
+use common::config::Config;
 use common::packet::*;
 use util::packet::*;
 use serde_json::json;
 
-pub fn handle(socket: std::sync::mpsc::Sender<Vec<u8>>, packet: Packet) {
+use std::sync::mpsc;
+use std::sync::mpsc::{Sender,Receiver};
+
+pub fn handle(socket: Sender<Vec<u8>>, config: Sender<Sender<Config>>, packet: Packet) {
     let Packet { pid, state, data } = packet;
     let (_, offset) = read_varint(&data, 0).unwrap();
     let (packet_id, offset) = read_varint(&data, offset).unwrap();
@@ -13,12 +17,13 @@ pub fn handle(socket: std::sync::mpsc::Sender<Vec<u8>>, packet: Packet) {
         1 => {
             match packet_id {
                 0 => {
-                    let description = ChatBuilder::new("Welcome to")
-                        .color("yellow")
-                        .space()
-                        .append(
-                            ChatBuilder::new("Crust").color("gold")
-                        )
+                    let (resp_tx, resp_rx): (Sender<Config>, Receiver<Config>) = mpsc::channel();
+                    config.send(resp_tx).unwrap();
+                    let config = resp_rx.recv().unwrap();
+
+                    let description = ChatBuilder::new(&config.status.motd)
+                        .color("gold")
+                        .bold()
                         .finish();
 
                     let protocol = state["protocol"].as_u64().unwrap() as u16;
@@ -30,7 +35,7 @@ pub fn handle(socket: std::sync::mpsc::Sender<Vec<u8>>, packet: Packet) {
                             "protocol": if let None = version { 0 } else { protocol },
                         },
                         "players": {
-                            "max": 100,
+                            "max": config.status.max_players,
                             "online": 0,
                             "sample": [],
                         },

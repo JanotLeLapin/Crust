@@ -1,0 +1,4 @@
+[status]
+motd = "Welcome to Crust"
+max_players = 100
+
