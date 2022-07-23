@@ -1,5 +1,4 @@
-use common::chat::ChatBuilder;
-use common::config::Config;
+use common::{ChatBuilder,Config,game::GameCommand};
 use common::packet::*;
 use util::packet::*;
 use serde_json::json;
@@ -7,7 +6,7 @@ use serde_json::json;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender,Receiver};
 
-pub fn handle(socket: Sender<Vec<u8>>, config: Sender<Sender<Config>>, packet: Packet) {
+pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet) {
     let Packet { pid, state, data } = packet;
     let (_, offset) = read_varint(&data, 0).unwrap();
     let (packet_id, offset) = read_varint(&data, offset).unwrap();
@@ -18,7 +17,7 @@ pub fn handle(socket: Sender<Vec<u8>>, config: Sender<Sender<Config>>, packet: P
             match packet_id {
                 0 => {
                     let (resp_tx, resp_rx): (Sender<Config>, Receiver<Config>) = mpsc::channel();
-                    config.send(resp_tx).unwrap();
+                    game.send(GameCommand::GetConfig { resp: resp_tx }).unwrap();
                     let config = resp_rx.recv().unwrap();
 
                     let description = ChatBuilder::new(&config.status.motd)

@@ -1,6 +1,7 @@
 mod handler;
 
-use common::config::Config;
+use common::Game;
+use common::game::GameCommand;
 
 use std::io::prelude::*;
 use std::net::TcpListener;
@@ -21,12 +22,20 @@ fn main() {
             thread_socket.flush().unwrap();
         });
 
-        let (config_tx, config_rx): (Sender<Sender<Config>>, Receiver<Sender<Config>>) = mpsc::channel();
+        let (game_tx, game_rx): (Sender<GameCommand>, Receiver<GameCommand>) = mpsc::channel();
         thread::spawn(move || {
-            let content = std::fs::read_to_string("config.toml").unwrap();
-            let config: Config = toml::from_str(&content).unwrap();
-            while let Ok(resp) = config_rx.recv() {
-                resp.send(config.clone()).unwrap();
+            // Construct game
+            let game = Game::new(
+                // Config
+                toml::from_str(
+                    &std::fs::read_to_string("config.toml").unwrap()
+                ).unwrap()
+            );
+            while let Ok(cmd) = game_rx.recv() {
+                use GameCommand::*;
+                match cmd {
+                    GetConfig { resp } => resp.send(game.config()).unwrap(),
+                };
             }
         });
 
@@ -48,7 +57,7 @@ fn main() {
             let packet = &buffer[0..len];
             let decoded = serde_json::from_slice(packet).unwrap();
 
-            handler::handle(socket_tx.clone(), config_tx.clone(), decoded);
+            handler::handle(socket_tx.clone(), game_tx.clone(), decoded);
         };
     }
 }
