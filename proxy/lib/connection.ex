@@ -31,8 +31,9 @@ defmodule Proxy.Connection do
     case length(packets) do
       0 -> result
       _ ->
-        {size, offset} = Proxy.Util.read_varint(packets, 0)
-        unmerge_packets(packets |> Enum.drop(size + offset), result ++ [packets |> Enum.drop(offset) |> Enum.take(size)])
+        # Size is a 4 bytes integer
+        size = packets |> Proxy.Util.bytes_to_int()
+        unmerge_packets(packets |> Enum.drop(size + 4), result ++ [packets |> Enum.drop(4) |> Enum.take(size)])
     end
   end
 
@@ -45,8 +46,7 @@ defmodule Proxy.Connection do
       pid = message["pid"] |> decode_pid()
       pid |> GenServer.cast({:message, message["data"]})
 
-      state = message["state"]
-      if state != nil do
+      if message |> Map.has_key?("state") do
         pid |> GenServer.cast({:state, message["state"]})
       end
     end)

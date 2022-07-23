@@ -16,22 +16,16 @@ defmodule Proxy.Util do
     read_varint(offset, offset, 0, data)
   end
 
-  defp write_varint(value, result) do
-    if ((value &&& 0x80) == 0) do
-      result ++ [value]
-    else
-      write_varint(value >>> 7, result ++ [(value &&& 0x7F)])
-    end
-  end
-
-  def write_varint(value) do
-    write_varint(value, [])
-  end
-
   def int_to_bytes(value) do
     Enum.map(0..3, fn i ->
-      value >>> (3 - i) * 8
+      (value >>> ((3 - i) * 8)) &&& 0xFF
     end)
+  end
+
+  def bytes_to_int(bytes) do
+    Enum.map(0..3, fn i ->
+      (bytes |> Enum.at(i)) <<< (3 - i) * 8
+    end) |> Enum.sum()
   end
 end
 

@@ -4,6 +4,7 @@ use serde_json::{Value,json};
 #[derive(Serialize,Deserialize)]
 pub struct Packet {
     pub pid: String,
+    #[serde(skip_serializing_if = "Value::is_null")]
     pub state: Value,
     pub data: Vec<u8>,
 }
@@ -11,7 +12,7 @@ pub struct Packet {
 pub struct PacketBuilder {
     packet_id: i32,
     process_id: String,
-    state: Option<Value>,
+    state: Value,
     data: Vec<u8>,
 }
 
@@ -29,18 +30,27 @@ fn to_varint(value: i32) -> Vec<u8> {
     }
 }
 
+fn to_sized<T: num::Num + num::ToPrimitive>(value: T) -> Vec<u8> {
+    let mut sized: Vec<u8> = Vec::new();
+    let size = std::mem::size_of_val(&value);
+    for i in 0..size {
+        sized.push(((value.to_usize().unwrap() >> (size - 1 - i) * 8) & 0xFF) as u8)
+    };
+    sized
+}
+
 impl PacketBuilder {
     pub fn new(packet_id: i32, process_id: String) -> Self {
         PacketBuilder {
             packet_id,
             process_id,
-            state: None,
+            state: Value::Null,
             data: Vec::new(),
         }
     }
 
     pub fn state(mut self, state: Value) -> Self {
-        self.state = Some(state);
+        self.state = state;
         self
     }
 
@@ -57,10 +67,7 @@ impl PacketBuilder {
     }
 
     pub fn write_sized<T: num::Num + num::ToPrimitive>(mut self, value: T) -> Self {
-        let size = std::mem::size_of_val(&value);
-        for i in 0..size {
-            self.data.push(((value.to_usize().unwrap() >> (size - 1 - i) * 8) & 0xFF) as u8)
-        };
+        self.data.append(&mut to_sized(value));
         self
     }
 
@@ -77,10 +84,10 @@ impl PacketBuilder {
         // Additional metadata, will be interpreted by the proxy
         let mut wrap = json!(Packet {
             pid: self.process_id,
-            state: self.state.unwrap_or(Value::Null),
+            state: self.state,
             data,
         }).to_string().into_bytes();
-        let mut packet = to_varint(wrap.len() as i32);
+        let mut packet = to_sized(wrap.len() as u32);
         packet.append(&mut wrap);
 
         // The final packet should look like:
