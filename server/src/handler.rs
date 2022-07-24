@@ -1,4 +1,4 @@
-use common::{ChatBuilder,Config,game::GameCommand};
+use common::{ChatBuilder,Client,Config,client::ClientRef,game::GameCommand};
 use common::packet::*;
 use util::packet::*;
 use serde_json::json;
@@ -59,12 +59,16 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet
         }
         // Login
         2 => {
-            let (name, _) = read_string(&data, offset).unwrap();
+            let (username, _) = read_string(&data, offset).unwrap();
+
+            let mut state = state.clone();
+            state["username"] = json!(username);
 
             // Login succes packet
             let login_success = PacketBuilder::new(0x02, pid.clone())
                 .write_string(uuid::Uuid::new_v4().to_string())
-                .write_string(name)
+                .write_string(username)
+                .state(state.clone())
                 .finish();
 
             // Join game packet
@@ -80,20 +84,57 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet
                 0x15 => {
                     let (locale, _) = util::packet::read_string(&data, offset).unwrap();
 
-                    // Check client version
-                    if let None = util::version::from_protocol(state["protocol"].as_u64().unwrap() as u16) {
-                        let message = match locale.split("_").collect::<Vec<&str>>()[0] {
-                            "fr" => "Version non supportée.",
-                            _ => "Unsupported version."
-                        };
+                    match util::version::from_protocol(state["protocol"].as_u64().unwrap() as u16) {
+                        // Client uses an unsupported client
+                        None => {
+                            let message = match locale.split("_").collect::<Vec<&str>>()[0] {
+                                "fr" => "Version non supportée.",
+                                _ => "Unsupported version."
+                            };
 
-                        let chat = ChatBuilder::new(message).color("red").finish();
-                        let packet = PacketBuilder::new(0x40, pid)
-                            .write_string(serde_json::to_string(&chat).unwrap())
-                            .finish();
+                            let chat = ChatBuilder::new(message).color("red").finish();
+                            let packet = PacketBuilder::new(0x40, pid.clone())
+                                .write_string(serde_json::to_string(&chat).unwrap())
+                                .finish();
 
-                        socket.send(packet).unwrap();
-                    }
+                            socket.send(packet).unwrap();
+                        }
+                        // Client uses a supported version
+                        Some(version) => {
+                            // Remove "downloading terrain" screen
+                            let packet = PositionAndLookPacketBuilder::new(0.0, 0.0, 0.0).finish(pid.clone());
+                            socket.send(packet).unwrap();
+
+                            // Add client
+                            let client = Client::new(
+                                socket.clone(),
+                                pid,
+                                version,
+                                locale,
+                                String::from(state["username"].as_str().unwrap())
+                            );
+                            game.send(GameCommand::AddClient { client }).unwrap();
+                        }
+                    };
+                }
+                // Chat message
+                0x01 => {
+                    // Client message
+                    let (input, _) = util::packet::read_string(&data, offset).unwrap();
+
+                    // Get client
+                    let (resp_tx, resp_rx): (Sender<Option<ClientRef>>, Receiver<Option<ClientRef>>) = mpsc::channel();
+                    game.send(GameCommand::GetClient { process_id: pid, resp: resp_tx }).unwrap();
+                    let client = resp_rx.recv().unwrap().unwrap();
+                    let client = client.lock().unwrap();
+
+                    // Send message back to client
+                    let message = ChatBuilder::new(&format!("{}:", client.username()))
+                        .color("gray")
+                        .space()
+                        .append(ChatBuilder::new(&input))
+                        .finish();
+                    client.send_chat(message);
                 }
                 _ => {}
             }

@@ -13,6 +13,15 @@ impl Version {
     }
 }
 
+impl Clone for Version {
+    fn clone(&self) -> Self {
+        Self {
+            protocol: self.protocol,
+            name: self.name.clone(),
+        }
+    }
+}
+
 pub fn from_protocol(protocol: u16) -> Option<Version> {
     // Latest stable release associated with the given protocol id
     let name = String::from(match protocol {

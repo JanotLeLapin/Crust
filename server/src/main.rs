@@ -25,7 +25,7 @@ fn main() {
         let (game_tx, game_rx): (Sender<GameCommand>, Receiver<GameCommand>) = mpsc::channel();
         thread::spawn(move || {
             // Construct game
-            let game = Game::new(
+            let mut game = Game::new(
                 // Config
                 toml::from_str(
                     &std::fs::read_to_string("config.toml").unwrap()
@@ -35,6 +35,8 @@ fn main() {
                 use GameCommand::*;
                 match cmd {
                     GetConfig { resp } => resp.send(game.config()).unwrap(),
+                    GetClient { process_id, resp } => resp.send(game.client(process_id)).unwrap(),
+                    AddClient { client } => game.add_client(client.process_id(), client),
                 };
             }
         });
