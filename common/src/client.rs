@@ -46,9 +46,9 @@ impl Client {
         self.socket.send(packet).unwrap();
     }
 
-    pub fn send_chat(&self, chat: Chat) {
+    pub fn send_chat(&self, chat: &Chat) {
         let packet = PacketBuilder::new(0x02, self.process_id())
-            .write_string(serde_json::to_string(&chat).unwrap())
+            .write_string(serde_json::to_string(chat).unwrap())
             .write_sized(0 as u8) // Position (chat box)
             .finish();
 

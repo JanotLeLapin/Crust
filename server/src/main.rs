@@ -36,6 +36,7 @@ fn main() {
                 match cmd {
                     GetConfig { resp } => resp.send(game.config()).unwrap(),
                     GetClient { process_id, resp } => resp.send(game.client(process_id)).unwrap(),
+                    GetClients { resp } => resp.send(game.clients()).unwrap(),
                     AddClient { client } => game.add_client(client.process_id(), client),
                 };
             }

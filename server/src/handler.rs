@@ -1,8 +1,9 @@
-use common::{ChatBuilder,Client,Config,client::ClientRef,game::GameCommand};
+use common::{ChatBuilder,chat::Chat,Client,Config,client::ClientRef,game::GameCommand};
 use common::packet::*;
 use util::packet::*;
 use serde_json::json;
 
+use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender,Receiver};
 
@@ -122,19 +123,34 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet
                     // Client message
                     let (input, _) = util::packet::read_string(&data, offset).unwrap();
 
-                    // Get client
-                    let (resp_tx, resp_rx): (Sender<Option<ClientRef>>, Receiver<Option<ClientRef>>) = mpsc::channel();
-                    game.send(GameCommand::GetClient { process_id: pid, resp: resp_tx }).unwrap();
-                    let client = resp_rx.recv().unwrap().unwrap();
-                    let client = client.lock().unwrap();
+                    let message: Chat;
+                    {
+                        // Get client
+                        let (resp_tx, resp_rx): (Sender<Option<ClientRef>>, Receiver<Option<ClientRef>>) = mpsc::channel();
+                        game.send(GameCommand::GetClient { process_id: pid, resp: resp_tx }).unwrap();
+                        let client = resp_rx.recv().unwrap().unwrap();
+                        let client = client.lock().unwrap();
 
-                    // Send message back to client
-                    let message = ChatBuilder::new(&format!("{}:", client.username()))
-                        .color("gray")
-                        .space()
-                        .append(ChatBuilder::new(&input))
-                        .finish();
-                    client.send_chat(message);
+                        // Convert to chat component
+                        message = ChatBuilder::new(&format!("{}:", client.username()))
+                            .color("gray")
+                            .space()
+                            .append(ChatBuilder::new(&input))
+                            .finish();
+
+                        // MutexGuard gets dropped, we can access client
+                    }
+
+                    let message = &message;
+
+                    // Get clients
+                    let (resp_tx, resp_rx): (Sender<HashMap<String, ClientRef>>, Receiver<HashMap<String, ClientRef>>) = mpsc::channel();
+                    game.send(GameCommand::GetClients { resp: resp_tx }).unwrap();
+                    let clients = resp_rx.recv().unwrap();
+                    for (_, value) in clients {
+                        let client = value.lock().unwrap();
+                        client.send_chat(message);
+                    }
                 }
                 _ => {}
             }

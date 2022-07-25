@@ -27,6 +27,10 @@ impl Game {
         };
     }
 
+    pub fn clients(&self) -> HashMap<String, ClientRef> {
+        self.clients.clone()
+    }
+
     pub fn add_client(&mut self, process_id: String, client: Client) {
         self.clients.insert(process_id, Arc::new(Mutex::new(client)));
     }
@@ -39,6 +43,9 @@ pub enum GameCommand {
     GetClient {
         process_id: String,
         resp: Sender<Option<ClientRef>>,
+    },
+    GetClients {
+        resp: Sender<HashMap<String, ClientRef>>,
     },
     AddClient {
         client: Client,
