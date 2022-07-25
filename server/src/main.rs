@@ -1,9 +1,10 @@
 mod handler;
 
-use common::{client::ClientRef,Config};
+use common::{client::ClientRef,ChatBuilder,Config};
 use common::game::{GameCommand,Game};
 
 use std::collections::HashMap;
+use std::io;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::sync::{Arc,Mutex,mpsc};
@@ -37,6 +38,26 @@ fn main() {
                     GetClients { resp } => resp.send(clients.clone()).unwrap(),
                     AddClient { client } => { clients.insert(client.process_id(), Arc::new(Mutex::new(client))); },
                 };
+            }
+        });
+
+        let game = Game::new(game_tx.clone());
+        thread::spawn(move || loop {
+            // Get user input
+            let mut command = String::new();
+            print!("> ");
+            io::stdout().flush().unwrap();
+            io::stdin().read_line(&mut command).unwrap();
+
+            let chat = &ChatBuilder::new("Server:")
+                .space()
+                .append(ChatBuilder::new(&command.trim_end()).color("gray"))
+                .finish();
+
+            // Broadcast to each client
+            for (_, client) in game.clients() {
+                let client = client.lock().unwrap();
+                client.send_chat(chat);
             }
         });
 
