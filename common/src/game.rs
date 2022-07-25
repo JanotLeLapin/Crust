@@ -1,38 +1,57 @@
 use crate::{Config,Client,client::ClientRef};
 
-use std::sync::{Arc,Mutex,mpsc::Sender};
 use std::collections::HashMap;
+use std::sync::mpsc;
+
+use mpsc::Sender;
 
 pub struct Game {
-    config: Config,
-    clients: HashMap<String, ClientRef>,
+    tx: Sender<GameCommand>,
 }
 
 impl Game {
-    pub fn new(config: Config) -> Self {
+    pub fn new(tx: Sender<GameCommand>) -> Self {
         Self {
-            config,
-            clients: HashMap::new(),
+            tx,
         }
     }
 
+    pub fn tx(&self) -> Sender<GameCommand> {
+        self.tx.clone()
+    }
+
     pub fn config(&self) -> Config {
-        self.config.clone()
+        let (resp_tx, resp_rx) = mpsc::channel::<Config>();
+        self.tx.send(GameCommand::GetConfig {
+            resp: resp_tx,
+        }).unwrap();
+
+        resp_rx.recv().unwrap()
     }
 
     pub fn client(&self, process_id: String) -> Option<ClientRef> {
-        return match self.clients.get(&process_id) {
-            None => None,
-            Some(client) => Some(client.clone())
-        };
+        let (resp_tx, resp_rx) = mpsc::channel::<Option<ClientRef>>();
+        self.tx.send(GameCommand::GetClient {
+            process_id,
+            resp: resp_tx
+        }).unwrap();
+
+        resp_rx.recv().unwrap()
     }
 
     pub fn clients(&self) -> HashMap<String, ClientRef> {
-        self.clients.clone()
+        let (resp_tx, resp_rx) = mpsc::channel::<HashMap<String, ClientRef>>();
+        self.tx.send(GameCommand::GetClients {
+            resp: resp_tx
+        }).unwrap();
+
+        resp_rx.recv().unwrap()
     }
 
-    pub fn add_client(&mut self, process_id: String, client: Client) {
-        self.clients.insert(process_id, Arc::new(Mutex::new(client)));
+    pub fn add_client(&self, client: Client) {
+        self.tx.send(GameCommand::AddClient {
+            client,
+        }).unwrap();
     }
 }
 

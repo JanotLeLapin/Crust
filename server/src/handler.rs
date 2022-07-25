@@ -1,13 +1,11 @@
-use common::{ChatBuilder,chat::Chat,Client,Config,client::ClientRef,game::GameCommand};
+use common::{ChatBuilder,chat::Chat,Client,Game};
 use common::packet::*;
 use util::packet::*;
 use serde_json::json;
 
-use std::collections::HashMap;
-use std::sync::mpsc;
-use std::sync::mpsc::{Sender,Receiver};
+use std::sync::mpsc::Sender;
 
-pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet) {
+pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
     let Packet { pid, state, data } = packet;
     let (_, offset) = read_varint(&data, 0).unwrap();
     let (packet_id, offset) = read_varint(&data, offset).unwrap();
@@ -17,10 +15,7 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet
         1 => {
             match packet_id {
                 0 => {
-                    let (resp_tx, resp_rx): (Sender<Config>, Receiver<Config>) = mpsc::channel();
-                    game.send(GameCommand::GetConfig { resp: resp_tx }).unwrap();
-                    let config = resp_rx.recv().unwrap();
-
+                    let config = game.config();
                     let description = ChatBuilder::new(&config.status.motd)
                         .color("gold")
                         .bold()
@@ -114,7 +109,7 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet
                                 locale,
                                 String::from(state["username"].as_str().unwrap())
                             );
-                            game.send(GameCommand::AddClient { client }).unwrap();
+                            game.add_client(client);
                         }
                     };
                 }
@@ -126,9 +121,7 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet
                     let message: Chat;
                     {
                         // Get client
-                        let (resp_tx, resp_rx): (Sender<Option<ClientRef>>, Receiver<Option<ClientRef>>) = mpsc::channel();
-                        game.send(GameCommand::GetClient { process_id: pid, resp: resp_tx }).unwrap();
-                        let client = resp_rx.recv().unwrap().unwrap();
+                        let client = game.client(pid).unwrap();
                         let client = client.lock().unwrap();
 
                         // Convert to chat component
@@ -144,9 +137,7 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Sender<GameCommand>, packet: Packet
                     let message = &message;
 
                     // Get clients
-                    let (resp_tx, resp_rx): (Sender<HashMap<String, ClientRef>>, Receiver<HashMap<String, ClientRef>>) = mpsc::channel();
-                    game.send(GameCommand::GetClients { resp: resp_tx }).unwrap();
-                    let clients = resp_rx.recv().unwrap();
+                    let clients = game.clients();
                     for (_, value) in clients {
                         let client = value.lock().unwrap();
                         client.send_chat(message);

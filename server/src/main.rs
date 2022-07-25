@@ -1,12 +1,12 @@
 mod handler;
 
-use common::Game;
-use common::game::GameCommand;
+use common::{client::ClientRef,Config};
+use common::game::{GameCommand,Game};
 
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::TcpListener;
-use std::sync::mpsc;
-use std::sync::mpsc::{Sender,Receiver};
+use std::sync::{Arc,Mutex,mpsc};
 use std::thread;
 
 fn main() {
@@ -14,7 +14,7 @@ fn main() {
     for socket in listener.incoming() {
         let mut socket = socket.unwrap();
 
-        let (socket_tx, socket_rx): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = mpsc::channel();
+        let (socket_tx, socket_rx) = mpsc::channel::<Vec<u8>>();
         let mut thread_socket = socket.try_clone().unwrap();
 
         thread::spawn(move || while let Ok(message) = socket_rx.recv() {
@@ -22,22 +22,20 @@ fn main() {
             thread_socket.flush().unwrap();
         });
 
-        let (game_tx, game_rx): (Sender<GameCommand>, Receiver<GameCommand>) = mpsc::channel();
+        let (game_tx, game_rx) = mpsc::channel::<GameCommand>();
         thread::spawn(move || {
-            // Construct game
-            let mut game = Game::new(
-                // Config
-                toml::from_str(
-                    &std::fs::read_to_string("config.toml").unwrap()
-                ).unwrap()
-            );
+            let config: Config = toml::from_str(&std::fs::read_to_string("config.toml").unwrap()).unwrap();
+            let mut clients = HashMap::<String,ClientRef>::new();
             while let Ok(cmd) = game_rx.recv() {
                 use GameCommand::*;
                 match cmd {
-                    GetConfig { resp } => resp.send(game.config()).unwrap(),
-                    GetClient { process_id, resp } => resp.send(game.client(process_id)).unwrap(),
-                    GetClients { resp } => resp.send(game.clients()).unwrap(),
-                    AddClient { client } => game.add_client(client.process_id(), client),
+                    GetConfig { resp } => resp.send(config.clone()).unwrap(),
+                    GetClient { process_id, resp } => resp.send(match clients.get(&process_id) {
+                        None => None,
+                        Some(client) => Some(client.clone()),
+                    }).unwrap(),
+                    GetClients { resp } => resp.send(clients.clone()).unwrap(),
+                    AddClient { client } => { clients.insert(client.process_id(), Arc::new(Mutex::new(client))); },
                 };
             }
         });
@@ -60,7 +58,7 @@ fn main() {
             let packet = &buffer[0..len];
             let decoded = serde_json::from_slice(packet).unwrap();
 
-            handler::handle(socket_tx.clone(), game_tx.clone(), decoded);
+            handler::handle(socket_tx.clone(), Game::new(game_tx.clone()), decoded);
         };
     }
 }
