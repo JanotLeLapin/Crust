@@ -45,7 +45,6 @@ fn main() {
         thread::spawn(move || loop {
             // Get user input
             let mut command = String::new();
-            print!("> ");
             io::stdout().flush().unwrap();
             io::stdin().read_line(&mut command).unwrap();
 
