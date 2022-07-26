@@ -1,11 +1,9 @@
-use common::{ChatBuilder,chat::Chat,Client,Game};
+use common::{ChatBuilder,Game};
 use common::packet::*;
 use util::packet::*;
 use serde_json::json;
 
-use std::sync::mpsc::Sender;
-
-pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
+pub fn handle(game: Game, packet: Packet) {
     let Packet { pid, state, data } = packet;
     let (_, offset) = read_varint(&data, 0).unwrap();
     let (packet_id, offset) = read_varint(&data, offset).unwrap();
@@ -40,7 +38,7 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
                     let packet = PacketBuilder::new(0x00, pid)
                         .write_string(motd.to_string())
                         .finish();
-                    socket.send(packet).unwrap();
+                    game.send_packet(&packet);
                 }
                 1 => {
                     // Long value sent with ping request
@@ -48,7 +46,7 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
                     let packet = PacketBuilder::new(0x01, pid)
                         .write_sized(ping_long)
                         .finish();
-                    socket.send(packet).unwrap();
+                    game.send_packet(&packet)
                 }
                 _ => {}
             }
@@ -70,8 +68,8 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
             // Join game packet
             let join_game = JoinGamePacketBuilder::new().finish(pid, &state);
 
-            socket.send(login_success).unwrap();
-            socket.send(join_game).unwrap();
+            game.send_packet(&login_success);
+            game.send_packet(&join_game);
         }
         // Play
         3 => {
@@ -93,25 +91,18 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
                                 .write_string(serde_json::to_string(&chat).unwrap())
                                 .finish();
 
-                            socket.send(packet).unwrap();
+                            game.send_packet(&packet);
                         }
                         // Client uses a supported version
                         Some(version) => {
                             // Remove "downloading terrain" screen
                             let packet = PositionAndLookPacketBuilder::new(0.0, 0.0, 0.0).finish(pid.clone());
-                            socket.send(packet).unwrap();
+                            game.send_packet(&packet);
 
                             let username = state["username"].as_str().unwrap();
 
                             // Add client
-                            let client = Client::new(
-                                socket.clone(),
-                                pid,
-                                version,
-                                locale,
-                                String::from(username),
-                            );
-                            game.add_client(client);
+                            game.add_client(&pid, &version, &locale, username);
 
                             // Log join message
                             let message = format!("{} joined the game.", username);
@@ -119,8 +110,7 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
                             let chat = &ChatBuilder::new(&message)
                                 .color("yellow")
                                 .finish();
-                            for (_, client) in game.clients() {
-                                let client = client.lock().unwrap();
+                            for client in game.clients() {
                                 client.send_chat(chat);
                             }
                         }
@@ -131,31 +121,16 @@ pub fn handle(socket: Sender<Vec<u8>>, game: Game, packet: Packet) {
                     // Client message
                     let (input, _) = util::packet::read_string(&data, offset).unwrap();
 
-                    let message: String;
-                    let chat: Chat;
-                    {
-                        // Get client
-                        let client = game.client(pid).unwrap();
-                        let client = client.lock().unwrap();
-
-                        message = format!("{}: {}", client.username(), input);
-
-                        // Convert to chat component
-                        chat = ChatBuilder::new(&message)
-                            .color("gray")
-                            .finish();
-
-                        // MutexGuard gets dropped, we can access client
-                    }
-
+                    let client = game.client(&pid).unwrap();
+                    let message = format!("{}: {}", client.username(), input);
+                    let chat = &ChatBuilder::new(&message)
+                        .color("gray")
+                        .finish();
                     println!("{}", message);
-
-                    let chat = &chat;
 
                     // Get clients
                     let clients = game.clients();
-                    for (_, client) in clients {
-                        let client = client.lock().unwrap();
+                    for client in clients {
                         client.send_chat(chat);
                     }
                 }

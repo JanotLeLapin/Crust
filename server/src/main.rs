@@ -1,13 +1,14 @@
 mod handler;
+mod structures;
 
-use common::{client::ClientRef,ChatBuilder,Config};
+use common::{ChatBuilder,Config};
 use common::game::{GameCommand,Game};
 
 use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 use std::net::TcpListener;
-use std::sync::{Arc,Mutex,mpsc};
+use std::sync::mpsc;
 use std::thread;
 
 fn main() {
@@ -15,28 +16,36 @@ fn main() {
     for socket in listener.incoming() {
         let mut socket = socket.unwrap();
 
-        let (socket_tx, socket_rx) = mpsc::channel::<Vec<u8>>();
-        let mut thread_socket = socket.try_clone().unwrap();
-
-        thread::spawn(move || while let Ok(message) = socket_rx.recv() {
-            thread_socket.write(&message.as_slice()).unwrap();
-            thread_socket.flush().unwrap();
-        });
-
+        let mut game_socket = socket.try_clone().unwrap();
         let (game_tx, game_rx) = mpsc::channel::<GameCommand>();
         thread::spawn(move || {
             let config: Config = toml::from_str(&std::fs::read_to_string("config.toml").unwrap()).unwrap();
-            let mut clients = HashMap::<String,ClientRef>::new();
+            let mut clients = HashMap::<String, structures::client::Client>::new();
             while let Ok(cmd) = game_rx.recv() {
                 use GameCommand::*;
                 match cmd {
+                    SendPacket { packet } => {
+                        game_socket.write(packet.as_slice()).unwrap();
+                        game_socket.flush().unwrap();
+                    },
+
                     GetConfig { resp } => resp.send(config.clone()).unwrap(),
-                    GetClient { process_id, resp } => resp.send(match clients.get(&process_id) {
-                        None => None,
-                        Some(client) => Some(client.clone()),
-                    }).unwrap(),
-                    GetClients { resp } => resp.send(clients.clone()).unwrap(),
-                    AddClient { client } => { clients.insert(client.process_id(), Arc::new(Mutex::new(client))); },
+
+                    HasClient { resp, process_id } => resp.send(clients.contains_key(&process_id)).unwrap(),
+                    GetClientProperty { resp, process_id, property } => {
+                        let client = clients.get(&process_id).unwrap();
+                        resp.send(match property.as_str() {
+                            "locale" => client.locale.clone(),
+                            "username" => client.username.clone(),
+                            _ => String::from(""),
+                        }).unwrap();
+                    },
+                    GetClients { resp } => resp.send(clients.keys().cloned().collect()).unwrap(),
+                    AddClient { process_id, version, locale, username } => { clients.insert(process_id, structures::client::Client {
+                        version,
+                        locale,
+                        username,
+                    }); },
                 };
             }
         });
@@ -54,8 +63,7 @@ fn main() {
                 .finish();
 
             // Broadcast to each client
-            for (_, client) in game.clients() {
-                let client = client.lock().unwrap();
+            for client in game.clients() {
                 client.send_chat(chat);
             }
         });
@@ -78,7 +86,7 @@ fn main() {
             let packet = &buffer[0..len];
             let decoded = serde_json::from_slice(packet).unwrap();
 
-            handler::handle(socket_tx.clone(), Game::new(game_tx.clone()), decoded);
+            handler::handle(Game::new(game_tx.clone()), decoded);
         };
     }
 }

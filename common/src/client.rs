@@ -1,33 +1,20 @@
 use crate::chat::Chat;
-use util::{packet::PacketBuilder,version::Version};
+use crate::game::GameCommand;
 
-use std::sync::{Arc,Mutex,mpsc::Sender};
+use util::packet::PacketBuilder;
 
-pub type ClientRef = Arc<Mutex<Client>>;
+use std::sync::mpsc;
+use mpsc::Sender;
 
+#[derive(Clone)]
 pub struct Client {
-    socket: Sender<Vec<u8>>,
+    tx: Sender<GameCommand>,
     pid: String,
-    version: Version,
-    locale: String,
-    username: String,
 }
 
 impl Client {
-    pub fn new(
-        socket: Sender<Vec<u8>>,
-        pid: String,
-        version: Version,
-        locale: String,
-        username: String,
-    ) -> Self {
-        Self {
-            socket,
-            pid,
-            version,
-            locale,
-            username,
-        }
+    pub fn new(tx: Sender<GameCommand>, pid: String) -> Self {
+        Self { tx, pid, }
     }
 
     pub fn process_id(&self) -> String {
@@ -35,15 +22,27 @@ impl Client {
     }
 
     pub fn locale(&self) -> String {
-        self.locale.clone()
+        let (tx, rx) = mpsc::channel::<String>();
+        self.tx.send(GameCommand::GetClientProperty {
+            resp: tx,
+            process_id: self.pid.clone(),
+            property: String::from("locale"),
+        }).unwrap();
+        return rx.recv().unwrap();
     }
 
     pub fn username(&self) -> String {
-        self.username.clone()
+        let (tx, rx) = mpsc::channel::<String>();
+        self.tx.send(GameCommand::GetClientProperty {
+            resp: tx,
+            process_id: self.pid.clone(),
+            property: String::from("username"),
+        }).unwrap();
+        return rx.recv().unwrap();
     }
 
-    pub fn send_packet(&self, packet: Vec<u8>) {
-        self.socket.send(packet).unwrap();
+    pub fn send_packet(&self, packet: &Vec<u8>) {
+        self.tx.send(GameCommand::SendPacket { packet: packet.clone() }).unwrap();
     }
 
     pub fn send_chat(&self, chat: &Chat) {
@@ -52,19 +51,7 @@ impl Client {
             .write_sized(0 as u8) // Position (chat box)
             .finish();
 
-        self.send_packet(packet);
-    }
-}
-
-impl Clone for Client {
-    fn clone(&self) -> Self {
-        Self {
-            socket: self.socket.clone(),
-            pid: self.pid.clone(),
-            version: self.version.clone(),
-            username: self.username.clone(),
-            locale: self.locale.clone(),
-        }
+        self.send_packet(&packet);
     }
 }
 

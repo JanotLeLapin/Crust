@@ -1,73 +1,93 @@
-use crate::{Config,Client,client::ClientRef};
+use crate::Client;
+use crate::Config;
 
-use std::collections::HashMap;
+use util::version::Version;
+
 use std::sync::mpsc;
-
 use mpsc::Sender;
 
 pub struct Game {
-    tx: Sender<GameCommand>,
+    game_tx: Sender<GameCommand>,
 }
 
 impl Game {
-    pub fn new(tx: Sender<GameCommand>) -> Self {
+    pub fn new(game_tx: Sender<GameCommand>) -> Self {
         Self {
-            tx,
+            game_tx,
         }
     }
 
-    pub fn tx(&self) -> Sender<GameCommand> {
-        self.tx.clone()
+    pub fn game_tx(&self) -> Sender<GameCommand> {
+        self.game_tx.clone()
+    }
+
+    pub fn send_packet(&self, packet: &Vec<u8>) {
+        self.game_tx.send(GameCommand::SendPacket { packet: packet.clone() }).unwrap();
     }
 
     pub fn config(&self) -> Config {
         let (resp_tx, resp_rx) = mpsc::channel::<Config>();
-        self.tx.send(GameCommand::GetConfig {
+        self.game_tx.send(GameCommand::GetConfig {
             resp: resp_tx,
         }).unwrap();
 
         resp_rx.recv().unwrap()
     }
 
-    pub fn client(&self, process_id: String) -> Option<ClientRef> {
-        let (resp_tx, resp_rx) = mpsc::channel::<Option<ClientRef>>();
-        self.tx.send(GameCommand::GetClient {
-            process_id,
+    pub fn client(&self, process_id: &str) -> Option<Client> {
+        let (resp_tx, resp_rx) = mpsc::channel::<bool>();
+        self.game_tx.send(GameCommand::HasClient {
+            resp: resp_tx,
+            process_id: process_id.to_string(),
+        }).unwrap();
+
+        match resp_rx.recv().unwrap() {
+            true => Some(Client::new(self.game_tx.clone(), process_id.to_string())),
+            false => None,
+        }
+    }
+
+    pub fn clients(&self) -> Vec<Client> {
+        let (resp_tx, resp_rx) = mpsc::channel::<Vec<String>>();
+        self.game_tx.send(GameCommand::GetClients {
             resp: resp_tx
         }).unwrap();
 
-        resp_rx.recv().unwrap()
+        resp_rx.recv().unwrap().into_iter().map(|pid| self.client(&pid).unwrap()).collect()
     }
 
-    pub fn clients(&self) -> HashMap<String, ClientRef> {
-        let (resp_tx, resp_rx) = mpsc::channel::<HashMap<String, ClientRef>>();
-        self.tx.send(GameCommand::GetClients {
-            resp: resp_tx
+    pub fn add_client(&self, process_id: &str, version: &Version, locale: &str, username: &str) -> Client {
+        self.game_tx.send(GameCommand::AddClient {
+            process_id: String::from(process_id),
+            version: version.clone(),
+            locale: String::from(locale),
+            username: String::from(username),
         }).unwrap();
 
-        resp_rx.recv().unwrap()
-    }
-
-    pub fn add_client(&self, client: Client) {
-        self.tx.send(GameCommand::AddClient {
-            client,
-        }).unwrap();
+        Client::new(self.game_tx.clone(), String::from(process_id))
     }
 }
 
 pub enum GameCommand {
-    GetConfig {
-        resp: Sender<Config>,
-    },
-    GetClient {
+    SendPacket { packet: Vec<u8> },
+
+    GetConfig { resp: Sender<Config> },
+
+    GetClients { resp: Sender<Vec<String>> },
+    HasClient {
+        resp: Sender<bool>,
         process_id: String,
-        resp: Sender<Option<ClientRef>>,
     },
-    GetClients {
-        resp: Sender<HashMap<String, ClientRef>>,
+    GetClientProperty {
+        resp: Sender<String>,
+        process_id: String,
+        property: String,
     },
     AddClient {
-        client: Client,
+        process_id: String,
+        version: Version,
+        locale: String,
+        username: String,
     },
 }
 
