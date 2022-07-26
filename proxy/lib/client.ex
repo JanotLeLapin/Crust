@@ -28,9 +28,22 @@ defmodule Proxy.Client do
     }}
   end
 
+  defp keep_alive(socket) do
+    socket |> :inet.send([2, 0, 42])
+    Process.sleep(10000)
+    keep_alive(socket)
+  end
+
   @impl true
   def handle_cast({:state, new_state}, state) do
-    # Received state change from server process, update state
+    # Received state change from server process
+    if new_state["state"] == 3 do
+      # State is now playing, we may start ping process
+      spawn_link(fn ->
+        keep_alive(state["socket"])
+      end)
+    end
+    # Update state
     {:noreply, new_state |> Map.put("socket", state["socket"])}
   end
 
