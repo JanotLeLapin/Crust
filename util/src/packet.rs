@@ -126,12 +126,10 @@ pub fn read_string(packet: &Vec<u8>, offset: usize) -> Option<(String, usize)> {
         }
     };
 
-    let mut res = String::new();
-    for i in 0..size {
-        res.push(packet[i + offset] as char);
-    };
-
-    Some((res, offset + size))
+    match String::from_utf8(packet[offset..size+offset].to_vec()) {
+        Ok(res) => Some((res, offset + size)),
+        Err(_) => None
+    }
 }
 
 pub fn read_sized<T: num::Num + num::FromPrimitive>(packet: &Vec<u8>, offset: usize) -> (T, usize) {
