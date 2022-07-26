@@ -13,10 +13,14 @@ Requirements:
 - [Rust](https://www.rust-lang.org/)
 - [Elixir](https://elixir-lang.org/)
 
+Run the following commands:
+
 From the root:
 
 ```sh
 cargo run --release
+# If you want the debug logs, you may also run:
+# RUST_LOG=debug cargo run --release
 ```
 
 From the `proxy/` directory:

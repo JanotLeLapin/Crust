@@ -1,6 +1,9 @@
 use common::{ChatBuilder,Game};
 use common::packet::*;
 use util::packet::*;
+
+use log::info;
+
 use serde_json::json;
 
 pub fn handle(game: Game, packet: Packet) {
@@ -106,7 +109,7 @@ pub fn handle(game: Game, packet: Packet) {
 
                             // Log join message
                             let message = format!("{} joined the game.", username);
-                            println!("{}", message);
+                            info!("{}", message);
                             let chat = &ChatBuilder::new(&message)
                                 .color("yellow")
                                 .finish();
@@ -126,7 +129,7 @@ pub fn handle(game: Game, packet: Packet) {
                     let chat = &ChatBuilder::new(&message)
                         .color("gray")
                         .finish();
-                    println!("{}", message);
+                    info!("{}", message);
 
                     // Get clients
                     let clients = game.clients();
@@ -137,7 +140,7 @@ pub fn handle(game: Game, packet: Packet) {
                 _ => {}
             }
         }
-        state => println!("Unknown state: {}", state)
+        _ => {}
     }
 }
 

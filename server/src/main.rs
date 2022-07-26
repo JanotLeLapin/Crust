@@ -4,6 +4,9 @@ mod structures;
 use common::{ChatBuilder,Config};
 use common::game::{GameCommand,Game};
 
+use log::debug;
+use env_logger::{Env,Builder};
+
 use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
@@ -12,10 +15,18 @@ use std::sync::mpsc;
 use std::thread;
 
 fn main() {
+    // Init logger
+    let env = Env::default().default_filter_or("info");
+    Builder::from_env(env)
+        .format_level(true)
+        .format_indent(Some(4))
+        .format_timestamp_millis()
+        .init();
+
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
     for socket in listener.incoming() {
+        debug!("Proxy connected");
         let mut socket = socket.unwrap();
-
         let mut game_socket = socket.try_clone().unwrap();
         let (game_tx, game_rx) = mpsc::channel::<GameCommand>();
         thread::spawn(move || {
