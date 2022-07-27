@@ -114,7 +114,7 @@ pub fn handle(game: Game, packet: Packet) {
                                 .color("yellow")
                                 .finish();
                             for client in game.clients() {
-                                client.send_chat(chat);
+                                client.send_message(chat);
                             }
                         }
                     };
@@ -134,7 +134,7 @@ pub fn handle(game: Game, packet: Packet) {
                     // Get clients
                     let clients = game.clients();
                     for client in clients {
-                        client.send_chat(chat);
+                        client.send_message(chat);
                     }
                 }
                 _ => {}

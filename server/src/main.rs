@@ -75,7 +75,7 @@ fn main() {
 
             // Broadcast to each client
             for client in game.clients() {
-                client.send_chat(chat);
+                client.send_message(chat);
             }
         });
 

@@ -1,4 +1,4 @@
-use crate::chat::Chat;
+use crate::chat::{ChatBuilder,Chat};
 use crate::game::GameCommand;
 
 use util::packet::PacketBuilder;
@@ -45,13 +45,28 @@ impl Client {
         self.tx.send(GameCommand::SendPacket { packet: packet.clone() }).unwrap();
     }
 
-    pub fn send_chat(&self, chat: &Chat) {
+    fn send_chat(&self, chat: &Chat, position: u8) {
         let packet = PacketBuilder::new(0x02, self.process_id())
             .write_string(serde_json::to_string(chat).unwrap())
-            .write_sized(0 as u8) // Position (chat box)
+            .write_sized(position)
             .finish();
 
         self.send_packet(&packet);
+    }
+
+    /// Sends a chat message in the client's chat box
+    pub fn send_message(&self, chat: &Chat) {
+        self.send_chat(chat, 0);
+    }
+
+    /// Sends a system message in the client's chat box
+    pub fn send_system_message(&self, chat: &Chat) {
+        self.send_chat(chat, 1);
+    }
+
+    /// Displays a message above the client's hotbar
+    pub fn send_hotbar(&self, message: &str) {
+        self.send_chat(&ChatBuilder::new(message).finish(), 2);
     }
 }
 
