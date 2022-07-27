@@ -5,3 +5,8 @@ members = [
     "util",
 ]
 
+[profile.release]
+strip = true
+lto = true
+panic = "abort"
+
