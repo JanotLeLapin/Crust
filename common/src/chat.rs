@@ -22,6 +22,43 @@ pub struct Chat {
     pub extra: Vec<Self>,
 }
 
+impl Chat {
+    pub fn to_old(&self) -> String {
+        let mut old = String::new();
+        old.push_str (match self.color.as_ref().unwrap_or(&String::new()).as_str() {
+            "black" => "§0",
+            "dark_blue" => "§1",
+            "dark_green" => "§2",
+            "dark_aqua" => "§3",
+            "dark_red" => "§4",
+            "dark_purple" => "§5",
+            "gold" => "§6",
+            "gray" => "§7",
+            "dark_gray" => "§8",
+            "blue" => "§9",
+            "green" => "§a",
+            "aqua" => "§b",
+            "red" => "§c",
+            "light_purple" => "§d",
+            "yellow" => "§e",
+            "white" => "§f",
+            _ => "",
+        });
+        if self.bold { old.push_str("§l") };
+        if self.italic { old.push_str("§o") };
+        if self.underlined { old.push_str("§n") };
+        if self.strikethrough { old.push_str("§m") };
+        if self.obfuscated { old.push_str("§k") };
+        old.push_str(&self.text);
+
+        for extra in &self.extra {
+            old.push_str(&extra.to_old());
+        }
+
+        old
+    }
+}
+
 /// Utility struct for making Minecraft [chat](https://wiki.vg/Chat) objects
 ///
 /// # Example

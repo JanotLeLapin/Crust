@@ -65,8 +65,8 @@ impl Client {
     }
 
     /// Displays a message above the client's hotbar
-    pub fn send_hotbar(&self, message: &str) {
-        self.send_chat(&ChatBuilder::new(message).finish(), 2);
+    pub fn send_hotbar(&self, chat: &Chat) {
+        self.send_chat(&ChatBuilder::new(&chat.to_old()).finish(), 2);
     }
 }
 
