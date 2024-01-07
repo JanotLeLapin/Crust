@@ -23,13 +23,17 @@
       "proxy"
       "server"
     ] (crate: let
+      manifest = builtins.fromTOML (builtins.readFile (./. + "/${crate}/Cargo.toml"));
       args = {
-        src = craneLib.cleanCargoSource (craneLib.path (./. + "/${crate}"));
+        pname = manifest.package.name;
+        version = manifest.package.version;
+        src = craneLib.cleanCargoSource (craneLib.path ./.);
         strictDeps = true;
         buildInputs = [];
         cargoLock = ./Cargo.lock;
+        cargoExtraArgs = "-p ${crate}";
+        cargoArtifacts = craneLib.buildDepsOnly args;
       };
-      cargoArtifacts = craneLib.buildDepsOnly args;
-    in craneLib.buildPackage (args // { inherit cargoArtifacts; })));
+    in craneLib.buildPackage args));
   };
 }
