@@ -5,5 +5,6 @@ edition = "2021"
 
 [dependencies]
 crust-protocol = { path = "../protocol", package = "protocol" }
+crust-macros = { path = "../macros", package = "macros" }
 
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "io-util"] }

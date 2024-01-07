@@ -52,12 +52,14 @@ pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Resu
                 match id {
                     0 => {
                         let res = Status {
-                            json_response: "{\"version\":{\"name\":\"1.8.9\",\"protocol\":47},\"players\":{\"max\":100,\"online\":0,\"sample\":[]},\"description\":{\"text\":\"Hello\"}}",
-                        };
-                        socket.write_all(&res.serialize()).await?;
+                            json_response: "{\"version\":{\"name\":\"1.8.9\",\"protocol\":47},\"players\":{\"max\":100,\"online\":0,\"sample\":[]},\"description\":{\"text\":\"Hello \"}}",
+                        }.serialize();
+                        println!("{:?}", res);
+                        socket.write_all(&res).await?;
                     },
                     1 => {
                         let res = PingResponse { payload: buf.read_i64().unwrap() }.serialize();
+                        println!("{:?}", res);
                         socket.write_all(&res).await?;
                     },
                     _ => {},

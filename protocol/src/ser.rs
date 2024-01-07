@@ -1,3 +1,17 @@
+macro_rules! num {
+    ($type: ty) => {
+        impl Serialize for $type {
+            fn size(&self) -> usize {
+                std::mem::size_of::<$type>()
+            }
+
+            fn serialize(&self) -> Vec<u8> {
+                self.to_be_bytes().to_vec()
+            }
+        }
+    };
+}
+
 macro_rules! varnum {
     ($name: ident, $type: ty, $unsigned_type: ty, $bytes: literal) => {
         #[derive(Debug, PartialEq)]
@@ -33,16 +47,24 @@ pub trait Serialize {
     fn serialize(&self) -> Vec<u8>;
 }
 
+num!(u8);
+num!(i8);
+num!(u16);
+num!(i16);
+num!(i32);
+num!(i64);
+
 varnum!(VarInt, i32, u32, 4);
 varnum!(VarLong, i64, u64, 8);
 
 impl<'a> Serialize for &'a str {
-    fn size(&self) -> usize { self.len() }
+    fn size(&self) -> usize {
+        VarInt(self.len() as i32).size() + self.len()
+    }
 
     fn serialize(&self) -> Vec<u8> {
-        let size = self.size();
-        let mut res = Vec::with_capacity(size + 5);
-        res.append(&mut VarInt(size as i32).serialize());
+        let mut res = Vec::with_capacity(self.size() + 5);
+        res.append(&mut VarInt(self.len() as i32).serialize());
         res.append(&mut self.chars().map(|c| c as u8).collect());
         res
     }
