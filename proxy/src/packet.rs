@@ -1,17 +1,11 @@
-use crust_protocol::ser::*;
-
-pub trait Packet {
-    fn id() -> VarInt;
-}
-
 #[derive(crust_macros::Packet)]
+#[packet_id(0x00)]
 pub struct Status<'a> {
     pub json_response: &'a str,
 }
-impl<'a> Packet for Status<'a> { fn id() -> VarInt { VarInt(0x00) } }
 
 #[derive(crust_macros::Packet)]
+#[packet_id(0x01)]
 pub struct PingResponse {
     pub payload: i64,
 }
-impl Packet for PingResponse { fn id() -> VarInt { VarInt(0x01) } }

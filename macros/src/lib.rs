@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
-#[proc_macro_derive(Packet)]
+#[proc_macro_derive(Packet, attributes(packet_id))]
 pub fn derive_client_bound_packet(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let name = input.ident;
@@ -11,6 +11,11 @@ pub fn derive_client_bound_packet(input: TokenStream) -> TokenStream {
     } else {
         quote! {}
     };
+
+    let packet_id = input.attrs.into_iter()
+        .find(|attr| attr.path().is_ident("packet_id"))
+        .map(|attr| attr.parse_args::<syn::Lit>().unwrap())
+        .expect("expected packet_id attribute");
 
     let expanded = match input.data {
         syn::Data::Struct(data) => {
@@ -26,7 +31,7 @@ pub fn derive_client_bound_packet(input: TokenStream) -> TokenStream {
                     let serialize_fn = {
                         let field_name = fields.named.iter().map(|f| &f.ident);
                         quote! {
-                            let s_size = VarInt(self.size() as i32);
+                            let s_size = crust_protocol::ser::VarInt(self.size() as i32);
                             let mut res = Vec::with_capacity(s_size.size() + 5);
                             res.append(&mut s_size.serialize());
                             res.append(&mut Self::id().serialize());
@@ -36,13 +41,17 @@ pub fn derive_client_bound_packet(input: TokenStream) -> TokenStream {
                     };
 
                     quote! {
-                        impl #lifetime Serialize for #name #lifetime {
+                        impl #lifetime crust_protocol::ser::Serialize for #name #lifetime {
                             fn size(&self) -> usize {
                                 #size_fn
                             }
                             fn serialize(&self) -> Vec<u8> {
                                 #serialize_fn
                             }
+                        }
+
+                        impl #lifetime #name #lifetime {
+                            fn id() -> crust_protocol::ser::VarInt { crust_protocol::ser::VarInt(#packet_id) }
                         }
                     }
                 },
@@ -51,8 +60,6 @@ pub fn derive_client_bound_packet(input: TokenStream) -> TokenStream {
         },
         _ => { unimplemented!() },
     };
-
-    println!("{}", expanded);
 
     expanded.into()
 }
