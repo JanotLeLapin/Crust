@@ -7,6 +7,16 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::packet::PingResponse;
 
+#[tokio::main]
+pub async fn main() -> tokio::io::Result<()> {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+
+    loop {
+        let (socket, _) = listener.accept().await?;
+        tokio::spawn(async move { handle_socket(socket).await });
+    }
+}
+
 pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Result<()> {
     let mut state = 0;
     loop {
@@ -55,15 +65,5 @@ pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Resu
             },
             _ => {},
         }
-    }
-}
-
-#[tokio::main]
-pub async fn main() -> tokio::io::Result<()> {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
-
-    loop {
-        let (socket, _) = listener.accept().await?;
-        tokio::spawn(async move { handle_socket(socket).await });
     }
 }
