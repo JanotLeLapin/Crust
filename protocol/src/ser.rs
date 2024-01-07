@@ -35,7 +35,7 @@ pub trait Serialize {
 varnum!(VarInt, i32, u32, 4);
 varnum!(VarLong, i64, u64, 8);
 
-impl Serialize for String {
+impl<'a> Serialize for &'a str {
     fn size(&self) -> usize { self.len() }
 
     fn serialize(&self) -> Vec<u8> {

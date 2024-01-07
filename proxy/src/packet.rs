@@ -4,12 +4,12 @@ trait Packet {
     fn id() -> VarInt;
 }
 
-pub struct Status {
-    pub json_response: String,
+pub struct Status<'a> {
+    pub json_response: &'a str,
 }
 
-impl Packet for Status { fn id() -> VarInt { VarInt(0x00) } }
-impl Serialize for Status {
+impl<'a> Packet for Status<'a> { fn id() -> VarInt { VarInt(0x00) } }
+impl<'a> Serialize for Status<'a> {
     fn size(&self) -> usize {
         Self::id().size() + self.json_response.size()
     }
