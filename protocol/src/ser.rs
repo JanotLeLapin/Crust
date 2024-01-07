@@ -59,11 +59,12 @@ varnum!(VarLong, i64, u64, 8);
 
 impl<'a> Serialize for &'a str {
     fn size(&self) -> usize {
-        VarInt(self.len() as i32).size() + self.len()
+        let len = self.len();
+        VarInt(len as i32).size() + len
     }
 
     fn serialize(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(self.size() + 5);
+        let mut res = Vec::with_capacity(self.size());
         res.append(&mut VarInt(self.len() as i32).serialize());
         res.append(&mut self.chars().map(|c| c as u8).collect());
         res

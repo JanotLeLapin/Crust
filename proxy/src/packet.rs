@@ -1,6 +1,6 @@
 use crust_protocol::ser::*;
 
-trait Packet {
+pub trait Packet {
     fn id() -> VarInt;
 }
 

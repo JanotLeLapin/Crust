@@ -26,10 +26,9 @@ pub fn derive_client_bound_packet(input: TokenStream) -> TokenStream {
                     let serialize_fn = {
                         let field_name = fields.named.iter().map(|f| &f.ident);
                         quote! {
-                            let size = self.size() - 1;
-                            let size = size + VarInt(size as i32).size();
-                            let mut res = Vec::with_capacity(size);
-                            res.append(&mut VarInt(size as i32).serialize());
+                            let s_size = VarInt(self.size() as i32);
+                            let mut res = Vec::with_capacity(s_size.size() + 5);
+                            res.append(&mut s_size.serialize());
                             res.append(&mut Self::id().serialize());
                             #(res.append(&mut self.#field_name.serialize());)*
                             res
