@@ -139,7 +139,6 @@ version = "0.1.0"
 name = "proxy"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "protocol",
  "tokio",
 ]

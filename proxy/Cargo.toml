@@ -7,5 +7,3 @@ edition = "2021"
 crust-protocol = { path = "../protocol", package = "protocol" }
 
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "io-util"] }
-
-bytes = "1.5"

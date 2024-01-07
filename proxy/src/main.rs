@@ -1,6 +1,11 @@
-use crust_protocol::Deserialize;
+mod packet;
+
+use packet::Status;
+
+use crust_protocol::{Deserialize,ser::Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use bytes::BufMut;
+
+use crate::packet::PingResponse;
 
 pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Result<()> {
     let mut state = 0;
@@ -36,18 +41,13 @@ pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Resu
             1 => {
                 match id {
                     0 => {
-                        let res = "{\"version\":{\"name\":\"1.8.9\",\"protocol\":47},\"players\":{\"max\":100,\"online\":0,\"sample\":[]},\"description\":{\"text\":\"Hello\"}}";
-                        let len = res.len() as u8;
-                        socket.write_u8(len + 2).await?;
-                        socket.write_u8(0x00).await?;
-                        socket.write_u8(len).await?;
-                        socket.write_all(res.as_bytes()).await?;
+                        let res = Status {
+                            json_response: "{\"version\":{\"name\":\"1.8.9\",\"protocol\":47},\"players\":{\"max\":100,\"online\":0,\"sample\":[]},\"description\":{\"text\":\"Hello\"}}".to_string(),
+                        };
+                        socket.write_all(&res.serialize()).await?;
                     },
                     1 => {
-                        let mut res = bytes::BytesMut::with_capacity(10);
-                        res.put_u8(9);
-                        res.put_u8(0x01);
-                        res.put_i64(buf.read_i64().unwrap());
+                        let res = PingResponse { payload: buf.read_i64().unwrap() }.serialize();
                         socket.write_all(&res).await?;
                     },
                     _ => {},
