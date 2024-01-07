@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+crust-protocol = { path = "../protocol", package = "protocol" }
+
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "io-util"] }
 
 bytes = "1.5"

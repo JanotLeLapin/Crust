@@ -1,8 +1,6 @@
-mod packet;
-
-use packet::RawPacket;
+use crust_protocol::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use bytes::{Buf, BufMut};
+use bytes::BufMut;
 
 pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Result<()> {
     let mut state = 0;
@@ -24,14 +22,14 @@ pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Resu
         socket.read_exact(&mut buf).await?;
         println!("{:?}", buf);
 
-        let mut buf = bytes::Bytes::from(buf);
-        let id = buf.get_varint().unwrap();
+        let mut buf = buf.into_iter();
+        let id = buf.read_varint().unwrap();
         match state {
             0 => {
-                let protocol = buf.get_varint().unwrap();
-                let server = buf.get_string().unwrap();
-                let port = buf.get_u16();
-                let next_state = buf.get_u8();
+                let protocol = buf.read_varint().unwrap();
+                let server = buf.read_string().unwrap();
+                let port = buf.read_u16().unwrap();
+                let next_state = buf.read_u8().unwrap();
                 println!("New handshake, protocol: {}, server: {}, port: {}", protocol, server, port);
                 state = next_state;
             },
@@ -49,7 +47,7 @@ pub async fn handle_socket(mut socket: tokio::net::TcpStream) -> tokio::io::Resu
                         let mut res = bytes::BytesMut::with_capacity(10);
                         res.put_u8(9);
                         res.put_u8(0x01);
-                        res.put_u64(buf.get_u64());
+                        res.put_i64(buf.read_i64().unwrap());
                         socket.write_all(&res).await?;
                     },
                     _ => {},

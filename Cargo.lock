@@ -132,10 +132,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "protocol"
+version = "0.1.0"
+
+[[package]]
 name = "proxy"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "protocol",
  "tokio",
 ]
 
