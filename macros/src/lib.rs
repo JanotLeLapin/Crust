@@ -6,11 +6,10 @@ pub fn derive_client_bound_packet(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let name = input.ident;
 
-    let lifetime = if input.generics.params.iter().any(|param| if let syn::GenericParam::Lifetime(_) = param { true } else { false }) {
-        quote! { <'a> }
-    } else {
-        quote! {}
-    };
+    let lifetime = if let Some(lifetime) = input.generics.lifetimes().next() {
+        let lifetime = &lifetime.lifetime;
+        quote! { <#lifetime> }
+    } else { quote! {} };
 
     let packet_id = input.attrs.into_iter()
         .find(|attr| attr.path().is_ident("packet_id"))
